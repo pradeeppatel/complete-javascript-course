@@ -3,8 +3,21 @@ var budgetController = (function() {
     var Expense = function(id, description, value) {
         this.id = id,
         this.description = description,
-        this.value = value
+        this.value = value,
+        this.percentage = 1
     };
+
+    Expense.prototype.calcPercentage = function(totalIncome) {
+        if (totalIncome > 0) {
+            this.percentage = Math.round((this.value / totalIncome) * 100);
+        } else {
+            this.percentage = -1;
+        }
+    };
+
+    Expense.prototype.getPercentage = function() {
+        return this.percentage;
+    }
 
     var Income = function (id, description, value) {
         this.id = id,
@@ -84,6 +97,19 @@ var budgetController = (function() {
             }
         },
 
+        calculatePercentages : function() {
+            data.allItems.exp.forEach(function(cur) {
+                cur.calcPercentage(data.totals.inc);
+            });
+        },
+
+        getPercentages : function() {
+            var allPerc = data.allItems.exp.map(function(cur) {
+                return cur.getPercentage();
+            })
+            return allPerc;
+        },
+
         getBudget : function() {
             return {
                 budget : data.budget,
@@ -112,7 +138,8 @@ var UIController = (function() {
         incomeLabel: '.budget__income--value',
         expensesLabel: '.budget__expenses--value',
         percentageLabel: '.budget__expenses--percentage',
-        container: '.container'
+        container: '.container',
+        expensesPercLabel: '.item__percentage'
     }
 
     return {
@@ -168,7 +195,7 @@ var UIController = (function() {
         },
 
         displayBudget : function(obj) {
-            document.querySelector(DOMstrings.budgetLabel).textContent = obj.budget;
+            document.querySelector(DOMstrings.budgetLabel).textContent = this.formatNumber(obj.budget);
             document.querySelector(DOMstrings.incomeLabel).textContent = obj.totalInc;
             document.querySelector(DOMstrings.expensesLabel).textContent = obj.totalExp;
             if (obj.percentage > 0) {
@@ -176,6 +203,25 @@ var UIController = (function() {
             } else {
                 document.querySelector(DOMstrings.percentageLabel).textContent = '--'
             }
+        },
+
+        displayPercentage : function(percentages) {
+            var fields = document.querySelectorAll(DOMstrings.expensesPercLabel);
+
+            var nodeListForEach = function(list, callback) {
+                for (var i = 0; i < list.length; i++) {
+                    callback(list[i], i);
+                }
+            };
+
+            nodeListForEach(fields, function(current, index) {
+                if (percentages[index] > 0) {
+                    current.textContent = percentages[index] + '%';
+                } else {
+                    current.textContent = '---';
+                }
+                
+            });
         },
 
         clearStrings : function() {
@@ -189,6 +235,30 @@ var UIController = (function() {
             });
 
             fields[0].focus();
+        },
+
+        formatNumber : function(num) {
+            var numString, numSplt, numInt, numDec, numArr, formatedNum;
+            numString = num.toString();
+            numSplt = numString.split('.');
+            numInt = numSplt[0];
+            numDec = numSplt[1];
+            numArr = Array.prototype.slice.call(numSplt[0]);
+            
+            for (var i = 0; i < (numArr.length - 1); i++) {
+                var j = numArr.length - i;
+                if (j % 3 === 1 && j !== 1) {
+                    numArr[i] += ',';
+                }
+            }
+            if (num > 0) {
+                formatedNum = numArr.join('') + '.' + numDec;
+            }
+            else {
+                formatedNum = '';
+            }
+
+            return formatedNum;
         },
 
         getDOMstrings : function() {
@@ -220,7 +290,10 @@ var controller = (function(budgetCtrl, UICtrl) {
     };
 
     var updatePercentages = function() {
-
+        budgetCtrl.calculatePercentages();
+        var percentages = budgetCtrl.getPercentages();
+        //console.log(percentages);
+        UICtrl.displayPercentage(percentages);
     };
     
     var ctrlAddItem = function() {
